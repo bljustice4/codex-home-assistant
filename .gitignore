@@ -1,0 +1,28 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+
+# Local working data and generated inventories.
+.local/
+backups/
+
+# Home Assistant secrets and runtime state.
+config/secrets.yaml
+config/.storage/
+config/deps/
+config/tts/
+config/home-assistant.log*
+config/home-assistant_v2.db*
+config/*.db
+config/*.db-*
+config/*.sqlite
+config/*.sqlite-*
+
+# Home Assistant backup archives.
+*.tar
+*.tar.gz
+*.partial
