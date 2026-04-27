@@ -21,20 +21,17 @@ scripts/inventory_climate.sh
 Edit YAML or dashboard files in `config/`, then run:
 
 ```bash
-.venv/bin/python scripts/validate_yaml.py
-scripts/check_config.sh
+scripts/preflight.sh --live
 ```
+
+Run `scripts/check_config.sh` separately when SSH is stable and you specifically want HAOS to validate the config currently on the Home Assistant box.
 
 ## Deploy
 
 Deploy only after validation passes:
 
 ```bash
-scripts/backup_ha.sh
-scripts/deploy_config.sh
-scripts/reload_ha.sh automations
-scripts/reload_ha.sh scripts
-scripts/reload_ha.sh scenes
+scripts/deploy_branch.sh automations scripts scenes
 ```
 
 Prefer targeted reloads. Use a restart only when a change requires it.
@@ -42,11 +39,7 @@ Prefer targeted reloads. Use a restart only when a change requires it.
 ## Rollback
 
 ```bash
-git switch main
-.venv/bin/python scripts/validate_yaml.py
-scripts/check_config.sh
-scripts/backup_ha.sh
-scripts/deploy_config.sh
+scripts/rollback_main.sh automations scripts scenes
 ```
 
 Then reload affected domains or restart Home Assistant if required.

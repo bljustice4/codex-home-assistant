@@ -31,3 +31,9 @@ Climate and dashboards:
 - Prefer reloadable YAML changes over restart-only changes.
 
 See `docs/CONNECT_HOME_ASSISTANT.md` and `docs/WORKFLOW.md`.
+
+## Branching And CI
+
+Use `main` as the last known good production config. Create short-lived feature branches directly from `main`; CI runs static checks only, and live deploys stay manual and backup-gated.
+
+See `docs/BRANCHING.md`.
