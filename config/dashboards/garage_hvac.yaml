@@ -1,0 +1,138 @@
+title: Garage HVAC
+views:
+  - title: Garage HVAC
+    path: garage-hvac
+    icon: mdi:garage-variant
+    cards:
+      - type: thermostat
+        entity: climate.garage_hvac
+        name: Garage Auto Climate
+
+      - type: entities
+        title: Priority And Control
+        show_header_toggle: false
+        entities:
+          - entity: input_select.garage_priority_mode
+            name: Priority
+          - entity: input_boolean.garage_hvac_enabled
+            name: Automation Enabled
+          - entity: climate.office
+            name: Ecobee Heat
+          - entity: climate.office_ac
+            name: Office AC
+
+      - type: glance
+        title: Demand State
+        show_state: true
+        columns: 4
+        entities:
+          - entity: input_boolean.garage_heat_demand
+            name: Heat Demand
+            icon: mdi:fire
+          - entity: input_boolean.garage_cool_demand
+            name: Cool Demand
+            icon: mdi:snowflake
+          - entity: binary_sensor.garage_furnace_heating
+            name: Furnace
+          - entity: binary_sensor.garage_ac_cooling
+            name: AC
+
+      - type: entities
+        title: Room Conditions
+        show_header_toggle: false
+        entities:
+          - entity: sensor.garage_control_temperature
+            name: Control Temperature
+          - entity: sensor.office_temperature
+            name: Ecobee Office Temperature
+          - entity: sensor.office_humidity
+            name: Ecobee Office Humidity
+          - entity: sensor.wood_shop_temperature
+            name: Wood Shop Temperature
+          - entity: sensor.office_cooling_puck_temperature
+            name: Office Puck Temperature
+          - entity: sensor.office_cooling_puck_humidity
+            name: Office Puck Humidity
+
+      - type: entities
+        title: Flair Airflow
+        show_header_toggle: false
+        entities:
+          - entity: climate.detached_garage_flair_structure
+            name: Flair Structure
+          - entity: select.detached_garage_flair_set_point_controller
+            name: Set Point Controller
+          - entity: select.detached_garage_flair_home_away
+            name: Home/Away
+          - entity: select.detached_garage_flair_active_schedule
+            name: Active Schedule
+          - entity: climate.office_heat_room
+            name: Office Room
+          - entity: climate.woodshop_heat_room
+            name: Wood Shop Room
+          - entity: select.office_heat_activity_status
+            name: Office Activity
+          - entity: select.woodshop_heat_activity_status
+            name: Wood Shop Activity
+
+      - type: entities
+        title: Vent Health
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.woodshop_heat_82d1_connection_status
+            name: Office Vent 1 Connection
+          - entity: sensor.woodshop_heat_82d1_voltage
+            name: Office Vent 1 Battery
+          - entity: sensor.woodshop_heat_82d1_reported_state
+            name: Office Vent 1 Position
+          - entity: binary_sensor.office_heat_d84a_connection_status
+            name: Office Vent 2 Connection
+          - entity: sensor.office_heat_d84a_voltage
+            name: Office Vent 2 Battery
+          - entity: sensor.office_heat_d84a_reported_state
+            name: Office Vent 2 Position
+          - entity: binary_sensor.office_heat_f54b_connection_status
+            name: Wood Shop Vent Connection
+          - entity: sensor.office_heat_f54b_voltage
+            name: Wood Shop Vent Battery
+          - entity: sensor.office_heat_f54b_reported_state
+            name: Wood Shop Vent Position
+
+      - type: entities
+        title: Runtime Today
+        show_header_toggle: false
+        entities:
+          - entity: sensor.garage_furnace_heating_today
+            name: Furnace Heating
+          - entity: sensor.garage_ac_cooling_today
+            name: AC Cooling
+          - entity: sensor.garage_heat_demand_today
+            name: Heat Demand
+          - entity: sensor.garage_cool_demand_today
+            name: Cool Demand
+
+      - type: history-graph
+        title: Last 12 Hours
+        hours_to_show: 12
+        entities:
+          - entity: sensor.garage_control_temperature
+            name: Control Temp
+          - entity: binary_sensor.garage_furnace_heating
+            name: Furnace
+          - entity: binary_sensor.garage_ac_cooling
+            name: AC
+
+      - type: entities
+        title: Advanced
+        show_header_toggle: false
+        entities:
+          - entity: input_number.garage_ac_default_setpoint
+            name: AC Actuator Setpoint
+          - entity: timer.garage_startup_grace
+            name: Startup Grace
+          - entity: timer.garage_setpoint_suppress
+            name: Setpoint Suppress
+          - entity: timer.garage_priority_suppress
+            name: Priority Suppress
+          - entity: input_boolean.garage_low_manual_request
+            name: Pending Heat Setpoint Sync

@@ -5,3 +5,4 @@ homekit:
         - switch.priority_office_2
         - switch.priority_wood_shop_2
         - switch.priority_balanced_2
+        - switch.priority_sleep

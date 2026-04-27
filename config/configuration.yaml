@@ -14,7 +14,15 @@ scene: !include scenes.yaml
 
 zeroconf:
 
+lovelace:
+  dashboards:
+    garage-hvac:
+      mode: yaml
+      filename: dashboards/garage_hvac.yaml
+      title: Garage HVAC
+      icon: mdi:garage-variant
+      show_in_sidebar: true
+
 homeassistant:
   packages: !include_dir_named packages
-
 
