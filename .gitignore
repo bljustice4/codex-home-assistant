@@ -15,12 +15,16 @@ config/secrets.yaml
 config/.storage/
 config/deps/
 config/tts/
+config/**/__pycache__/
+config/**/*.pyc
 config/home-assistant.log*
 config/home-assistant_v2.db*
+config/.ha_run.lock
 config/*.db
 config/*.db-*
 config/*.sqlite
 config/*.sqlite-*
+config/custom_components/hacs/hacs_frontend/
 
 # Home Assistant backup archives.
 *.tar

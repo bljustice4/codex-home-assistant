@@ -1,0 +1,661 @@
+###############################################################################
+# packages/garage_hvac.yaml
+# Detached Garage HVAC controller package (HA 2026.2+)
+###############################################################################
+
+#############################
+# MASTER ENABLE / DISABLE
+#############################
+input_boolean:
+  garage_hvac_enabled:
+    name: Garage HVAC Enabled
+    icon: mdi:power
+    initial: true
+
+  # Internal demand booleans (driven by template switches below)
+  garage_heat_demand:
+    name: Garage Heat Demand
+  garage_cool_demand:
+    name: Garage Cool Demand
+
+  # Only allow garage_hvac low -> Ecobee when user manually changed low
+  garage_low_manual_request:
+    name: Garage Low Manual Request
+    icon: mdi:hand-pointing-up
+
+
+#############################
+# PRIORITY (maps to Ecobee comfort presets)
+#############################
+input_select:
+  garage_priority_mode:
+    name: Garage Priority Mode
+    options:
+      - Office
+      - Wood Shop
+      - Balanced
+    initial: Office
+
+
+#############################
+# AC actuator setpoint (what we push to the window AC when cooling)
+#############################
+input_number:
+  garage_ac_default_setpoint:
+    name: Garage AC Default Setpoint
+    min: 50
+    max: 75
+    step: 1
+    mode: slider
+    unit_of_measurement: "°F"
+    initial: 65
+
+
+#############################
+# STARTUP GRACE (prevents HA from clobbering Ecobee schedule on restart)
+#############################
+timer:
+  garage_startup_grace:
+    name: Garage Startup Grace
+    duration: "00:02:00"
+
+  # Suppress timer (prevents echo-sync back to Ecobee when Ecobee -> HA updates)
+  garage_setpoint_suppress:
+    name: Garage Setpoint Suppress
+    duration: "00:00:30"   # match the old working stability window
+
+  # Suppress priority echo while Ecobee cloud "settles"
+  garage_priority_suppress:
+    name: Garage Priority Suppress
+    duration: "00:01:30"   # longer so you don’t get the 1-min “flip back” bounce
+
+
+#############################
+# TEMPLATE ENTITIES
+#############################
+template:
+  # Control temperature sensor (Ecobee current temp)
+  - sensor:
+      - name: Garage Control Temperature
+        unique_id: garage_control_temperature
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°F"
+        state: "{{ state_attr('climate.office', 'current_temperature') | float(0) }}"
+        availability: "{{ state_attr('climate.office', 'current_temperature') is not none }}"
+
+  # Binary sensors for true runtime tracking (hvac_action, not hvac_mode)
+  - binary_sensor:
+      - name: Garage Furnace Heating
+        unique_id: garage_furnace_heating
+        device_class: heat
+        state: "{{ state_attr('climate.office','hvac_action') == 'heating' }}"
+        availability: "{{ state_attr('climate.office','hvac_action') is not none }}"
+
+      - name: Garage AC Cooling
+        unique_id: garage_ac_cooling
+        device_class: cold
+        state: "{{ is_state('switch.office_ac_power','on') }}"
+        availability: "{{ states('switch.office_ac_power') not in ['unknown','unavailable'] }}"
+
+  # Demand switches (what dual_smart_thermostat toggles)
+  - switch:
+      - name: Garage Heat Demand
+        unique_id: garage_heat_demand
+        icon: mdi:fire
+        state: "{{ is_state('input_boolean.garage_heat_demand', 'on') }}"
+
+        turn_on:
+          # Only allow demand if enabled
+          - condition: state
+            entity_id: input_boolean.garage_hvac_enabled
+            state: "on"
+
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.garage_heat_demand }
+
+          # Ensure cooling demand is off
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.garage_cool_demand }
+
+          # Ensure AC is fully off
+          - service: climate.set_hvac_mode
+            target: { entity_id: climate.office_ac }
+            data: { hvac_mode: "off" }
+          - service: switch.turn_off
+            target: { entity_id: switch.office_ac_power }
+
+          # Arm Ecobee in HEAT ONLY (do NOT push setpoint here — manual-only sync handles that)
+          - service: climate.set_hvac_mode
+            target: { entity_id: climate.office }
+            data: { hvac_mode: "heat" }
+
+        turn_off:
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.garage_heat_demand }
+
+          # Keep Ecobee armed unless master is Cool-only or Off
+          - choose:
+              - conditions: "{{ states('climate.garage_hvac') == 'cool' }}"
+                sequence:
+                  - service: climate.set_hvac_mode
+                    target: { entity_id: climate.office }
+                    data: { hvac_mode: "off" }
+              - conditions: "{{ states('climate.garage_hvac') != 'off' }}"
+                sequence:
+                  - service: climate.set_hvac_mode
+                    target: { entity_id: climate.office }
+                    data: { hvac_mode: "heat" }
+
+      - name: Garage Cool Demand
+        unique_id: garage_cool_demand
+        icon: mdi:snowflake
+        state: "{{ is_state('input_boolean.garage_cool_demand', 'on') }}"
+
+        turn_on:
+          # Only allow demand if enabled
+          - condition: state
+            entity_id: input_boolean.garage_hvac_enabled
+            state: "on"
+
+          - service: input_boolean.turn_on
+            target: { entity_id: input_boolean.garage_cool_demand }
+
+          # Ensure heating demand is off
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.garage_heat_demand }
+
+          # In COOL-only master mode -> Ecobee OFF
+          # In HEAT_COOL -> keep Ecobee ARMED in HEAT
+          - choose:
+              - conditions: "{{ states('climate.garage_hvac') == 'cool' }}"
+                sequence:
+                  - service: climate.set_hvac_mode
+                    target: { entity_id: climate.office }
+                    data: { hvac_mode: "off" }
+              - conditions: "{{ states('climate.garage_hvac') == 'heat_cool' }}"
+                sequence:
+                  - service: climate.set_hvac_mode
+                    target: { entity_id: climate.office }
+                    data: { hvac_mode: "heat" }
+
+          # Cool via window AC (fixed actuator setpoint)
+          - service: switch.turn_on
+            target: { entity_id: switch.office_ac_power }
+          - delay: "00:00:03"
+          - service: climate.set_temperature
+            target: { entity_id: climate.office_ac }
+            data:
+              temperature: "{{ states('input_number.garage_ac_default_setpoint') | int(65) }}"
+          - service: climate.set_hvac_mode
+            target: { entity_id: climate.office_ac }
+            data: { hvac_mode: "cool" }
+
+        turn_off:
+          - service: input_boolean.turn_off
+            target: { entity_id: input_boolean.garage_cool_demand }
+
+          - service: climate.set_hvac_mode
+            target: { entity_id: climate.office_ac }
+            data: { hvac_mode: "off" }
+          - service: switch.turn_off
+            target: { entity_id: switch.office_ac_power }
+
+          # When cooling ends, if system is in HEAT or HEAT_COOL, arm heat again
+          - choose:
+              - conditions: "{{ states('climate.garage_hvac') in ['heat','heat_cool'] }}"
+                sequence:
+                  - service: climate.set_hvac_mode
+                    target: { entity_id: climate.office }
+                    data: { hvac_mode: "heat" }
+
+      - name: Priority Office
+        unique_id: hk_priority_office
+        icon: mdi:briefcase
+        state: "{{ is_state('input_select.garage_priority_mode','Office') }}"
+        turn_on:
+          - service: input_select.select_option
+            target: { entity_id: input_select.garage_priority_mode }
+            data: { option: "Office" }
+        turn_off:
+          - stop: "Ignore off (single-select)"
+
+      - name: Priority Wood Shop
+        unique_id: hk_priority_wood_shop
+        icon: mdi:tools
+        state: "{{ is_state('input_select.garage_priority_mode','Wood Shop') }}"
+        turn_on:
+          - service: input_select.select_option
+            target: { entity_id: input_select.garage_priority_mode }
+            data: { option: "Wood Shop" }
+        turn_off:
+          - stop: "Ignore off (single-select)"
+
+      - name: Priority Balanced
+        unique_id: hk_priority_balanced
+        icon: mdi:scale-balance
+        state: "{{ is_state('input_select.garage_priority_mode','Balanced') }}"
+        turn_on:
+          - service: input_select.select_option
+            target: { entity_id: input_select.garage_priority_mode }
+            data: { option: "Balanced" }
+        turn_off:
+          - stop: "Ignore off (single-select)"
+
+
+#############################
+# MASTER THERMOSTAT (Dual Smart Thermostat)
+#############################
+climate:
+  - platform: dual_smart_thermostat
+    name: Garage HVAC
+    unique_id: garage_hvac
+
+    heater: switch.garage_heat_demand
+    cooler: switch.garage_cool_demand
+
+    target_sensor: sensor.garage_control_temperature
+
+    heat_cool_mode: true
+    initial_hvac_mode: "heat_cool"
+
+    target_temp_low: 66
+    target_temp_high: 74
+
+    min_temp: 50
+    max_temp: 85
+    target_temp_step: 1
+    precision: 1
+
+    cold_tolerance: 1
+    hot_tolerance: 1
+
+    min_cycle_duration:
+      minutes: 2
+
+
+#############################
+# SCRIPTS — Priority applies Ecobee comfort + Flair activity
+#############################
+script:
+  garage_priority_office:
+    alias: "Garage - Priority Office"
+    mode: restart
+    sequence:
+      - condition: state
+        entity_id: input_boolean.garage_hvac_enabled
+        state: "on"
+
+      - service: climate.set_preset_mode
+        target: { entity_id: climate.office }
+        data: { preset_mode: "home" }
+
+      - service: select.select_option
+        target: { entity_id: select.office_heat_activity_status }
+        data: { option: "Active" }
+      - service: select.select_option
+        target: { entity_id: select.woodshop_heat_activity_status }
+        data: { option: "Inactive" }
+
+  garage_priority_wood_shop:
+    alias: "Garage - Priority Wood Shop"
+    mode: restart
+    sequence:
+      - condition: state
+        entity_id: input_boolean.garage_hvac_enabled
+        state: "on"
+
+      - service: climate.set_preset_mode
+        target: { entity_id: climate.office }
+        data: { preset_mode: "away" }
+
+      - service: select.select_option
+        target: { entity_id: select.office_heat_activity_status }
+        data: { option: "Inactive" }
+      - service: select.select_option
+        target: { entity_id: select.woodshop_heat_activity_status }
+        data: { option: "Active" }
+
+  garage_priority_balanced:
+    alias: "Garage - Priority Balanced"
+    mode: restart
+    sequence:
+      - condition: state
+        entity_id: input_boolean.garage_hvac_enabled
+        state: "on"
+
+      - service: climate.set_preset_mode
+        target: { entity_id: climate.office }
+        data: { preset_mode: "sleep" }
+
+      - service: select.select_option
+        target: { entity_id: select.office_heat_activity_status }
+        data: { option: "Active" }
+      - service: select.select_option
+        target: { entity_id: select.woodshop_heat_activity_status }
+        data: { option: "Active" }
+
+
+#############################
+# DAILY RUNTIME / DEMAND (since midnight)
+#############################
+sensor:
+  - platform: history_stats
+    name: Garage Furnace Heating Today
+    entity_id: binary_sensor.garage_furnace_heating
+    state: "on"
+    type: time
+    start: "{{ today_at() }}"
+    end: "{{ now() }}"
+
+  - platform: history_stats
+    name: Garage AC Cooling Today
+    entity_id: binary_sensor.garage_ac_cooling
+    state: "on"
+    type: time
+    start: "{{ today_at() }}"
+    end: "{{ now() }}"
+
+  - platform: history_stats
+    name: Garage Heat Demand Today
+    entity_id: input_boolean.garage_heat_demand
+    state: "on"
+    type: time
+    start: "{{ today_at() }}"
+    end: "{{ now() }}"
+
+  - platform: history_stats
+    name: Garage Cool Demand Today
+    entity_id: input_boolean.garage_cool_demand
+    state: "on"
+    type: time
+    start: "{{ today_at() }}"
+    end: "{{ now() }}"
+
+
+#############################
+# AUTOMATIONS
+#############################
+automation:
+  ###########################################################################
+  # Start startup grace on HA boot
+  ###########################################################################
+  - id: garage_startup_grace_begin
+    alias: "Garage HVAC - Start startup grace on boot"
+    mode: restart
+    trigger:
+      - platform: homeassistant
+        event: start
+    action:
+      - service: timer.start
+        target: { entity_id: timer.garage_startup_grace }
+
+  ###########################################################################
+  # Cancel startup grace immediately on manual HA changes
+  ###########################################################################
+  - id: garage_cancel_startup_grace_on_manual_change
+    alias: "Garage HVAC - Cancel startup grace on manual control"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_select.garage_priority_mode
+      - platform: state
+        entity_id: climate.garage_hvac
+        attribute: target_temp_low
+      - platform: state
+        entity_id: climate.garage_hvac
+        attribute: target_temp_high
+      - platform: state
+        entity_id: input_boolean.garage_hvac_enabled
+    condition:
+      - condition: state
+        entity_id: timer.garage_startup_grace
+        state: "active"
+      - condition: template
+        value_template: >
+          {{ trigger.to_state is not none
+             and trigger.to_state.context is not none
+             and trigger.to_state.context.user_id is not none }}
+    action:
+      - service: timer.cancel
+        target: { entity_id: timer.garage_startup_grace }
+
+  ###########################################################################
+  # Mark manual low change (enables Ecobee write)
+  ###########################################################################
+  - id: garage_mark_manual_low_change
+    alias: "Garage - Mark manual low change (enables Ecobee write)"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: climate.garage_hvac
+        attribute: target_temp_low
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_hvac_enabled
+        state: "on"
+      - condition: template
+        value_template: >
+          {{ trigger.to_state is not none
+             and trigger.to_state.context is not none
+             and trigger.to_state.context.user_id is not none }}
+    action:
+      - service: input_boolean.turn_on
+        target: { entity_id: input_boolean.garage_low_manual_request }
+
+  ###########################################################################
+  # MASTER OFF: hands off, Ecobee handles it (resume program only)
+  ###########################################################################
+  - id: garage_hvac_master_disable_hands_off
+    alias: "Garage HVAC - Master OFF = hands off (Ecobee handles it)"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_boolean.garage_hvac_enabled
+        to: "off"
+    action:
+      - service: climate.set_hvac_mode
+        target: { entity_id: climate.garage_hvac }
+        data: { hvac_mode: "off" }
+
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.garage_heat_demand
+            - input_boolean.garage_cool_demand
+            - input_boolean.garage_low_manual_request
+
+      - service: climate.set_hvac_mode
+        target: { entity_id: climate.office_ac }
+        data: { hvac_mode: "off" }
+      - service: switch.turn_off
+        target: { entity_id: switch.office_ac_power }
+
+      - service: ecobee.resume_program
+        target: { entity_id: climate.office }
+        data: { resume_all: true }
+
+  ###########################################################################
+  # Priority (HA) -> Ecobee preset + Flair rooms (MANUAL ONLY)
+  ###########################################################################
+  - id: garage_priority_to_ecobee_and_flair
+    alias: "Garage - Priority → Ecobee preset + Flair (MANUAL ONLY)"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_select.garage_priority_mode
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_hvac_enabled
+        state: "on"
+      - condition: state
+        entity_id: timer.garage_startup_grace
+        state: "idle"
+      # Manual-only so Ecobee->HA updates won't re-fire HA->Ecobee
+      - condition: template
+        value_template: >
+          {{ trigger.to_state is not none
+             and trigger.to_state.context is not none
+             and trigger.to_state.context.user_id is not none }}
+    action:
+      - service: timer.start
+        target: { entity_id: timer.garage_priority_suppress }
+
+      - choose:
+          - conditions: "{{ is_state('input_select.garage_priority_mode','Office') }}"
+            sequence:
+              - service: script.garage_priority_office
+          - conditions: "{{ is_state('input_select.garage_priority_mode','Wood Shop') }}"
+            sequence:
+              - service: script.garage_priority_wood_shop
+          - conditions: "{{ is_state('input_select.garage_priority_mode','Balanced') }}"
+            sequence:
+              - service: script.garage_priority_balanced
+
+  ###########################################################################
+  # Ecobee preset -> Priority (HA) (READ-ONLY; uses preset_mode like old working)
+  ###########################################################################
+  - id: garage_ecobee_preset_to_priority
+    alias: "Garage - Ecobee preset → Priority"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: climate.office
+      - platform: time_pattern
+        minutes: "/1"
+    variables:
+      preset: "{{ (state_attr('climate.office','preset_mode') or '') | string | lower | trim }}"
+      desired_priority: >-
+        {% if preset == 'home' %}Office
+        {% elif preset in ['away','away_indefinitely'] %}Wood Shop
+        {% elif preset == 'sleep' %}Balanced
+        {% else %}{{ states('input_select.garage_priority_mode') }}{% endif %}
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_hvac_enabled
+        state: "on"
+      # Don’t allow the “bounce” right after HA set it
+      - condition: state
+        entity_id: timer.garage_priority_suppress
+        state: "idle"
+      - condition: template
+        value_template: "{{ preset in ['home','away','away_indefinitely','sleep'] }}"
+      - condition: template
+        value_template: "{{ desired_priority != states('input_select.garage_priority_mode') }}"
+    action:
+      - service: input_select.select_option
+        target: { entity_id: input_select.garage_priority_mode }
+        data: { option: "{{ desired_priority }}" }
+
+  ###########################################################################
+  # Deadband enforcement (cool >= heat + 3°F)
+  ###########################################################################
+  - id: garage_hvac_enforce_deadband
+    alias: "Garage HVAC - Enforce 3°F Deadband"
+    mode: queued
+    trigger:
+      - platform: state
+        entity_id: climate.garage_hvac
+        attribute: target_temp_low
+      - platform: state
+        entity_id: climate.garage_hvac
+        attribute: target_temp_high
+    variables:
+      low: "{{ state_attr('climate.garage_hvac','target_temp_low') | float(0) }}"
+      high: "{{ state_attr('climate.garage_hvac','target_temp_high') | float(0) }}"
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_hvac_enabled
+        state: "on"
+      - condition: template
+        value_template: "{{ low > 0 and high > 0 and (high - low) < 3 }}"
+    action:
+      - service: climate.set_temperature
+        target: { entity_id: climate.garage_hvac }
+        data:
+          target_temp_low: "{{ low | round(0) | int }}"
+          target_temp_high: "{{ (low + 3) | round(0) | int }}"
+
+  ###########################################################################
+  # SETPOINT SYNC
+  # A) garage_hvac low -> Ecobee (WRITE) ONLY if manual flag is ON
+  # B) Ecobee -> garage_hvac low (READ/WRITE to garage_hvac) always allowed
+  ###########################################################################
+  - id: garage_sync_low_to_ecobee
+    alias: "Garage - Sync garage_hvac low → Ecobee setpoint (MANUAL ONLY)"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: climate.garage_hvac
+        attribute: target_temp_low
+    variables:
+      master_mode: "{{ states('climate.garage_hvac') }}"
+      low: "{{ (state_attr('climate.garage_hvac','target_temp_low') | float(0)) | round(0) | int }}"
+      ecobee_mode: "{{ states('climate.office') }}"
+      ecobee_sp_raw: "{{ state_attr('climate.office','temperature') }}"
+      ecobee_sp: "{{ (ecobee_sp_raw | float(0)) | round(0) | int if ecobee_sp_raw is not none else 0 }}"
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_hvac_enabled
+        state: "on"
+      - condition: state
+        entity_id: timer.garage_startup_grace
+        state: "idle"
+      - condition: state
+        entity_id: timer.garage_setpoint_suppress
+        state: "idle"
+      - condition: state
+        entity_id: input_boolean.garage_low_manual_request
+        state: "on"
+      - condition: template
+        value_template: "{{ master_mode in ['heat','heat_cool'] and low > 0 }}"
+      - condition: template
+        value_template: "{{ ecobee_mode == 'heat' }}"
+      - condition: template
+        value_template: "{{ ecobee_sp == 0 or (low - ecobee_sp) | abs >= 1 }}"
+    action:
+      - service: climate.set_temperature
+        target: { entity_id: climate.office }
+        data: { temperature: "{{ low }}" }
+
+      - service: timer.start
+        target: { entity_id: timer.garage_setpoint_suppress }
+        data: { duration: "00:00:30" }
+
+      - service: input_boolean.turn_off
+        target: { entity_id: input_boolean.garage_low_manual_request }
+
+  - id: garage_sync_ecobee_to_low
+    alias: "Garage - Sync Ecobee setpoint → garage_hvac low (1°F, stable)"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: climate.office
+      - platform: time_pattern
+        minutes: "/1"
+    variables:
+      master_mode: "{{ states('climate.garage_hvac') }}"
+      ecobee_sp_raw: "{{ state_attr('climate.office','temperature') }}"
+      ecobee_sp: "{{ (ecobee_sp_raw | float(0)) | round(0) | int if ecobee_sp_raw is not none else 0 }}"
+      low: "{{ (state_attr('climate.garage_hvac','target_temp_low') | float(0)) | round(0) | int }}"
+      high: "{{ (state_attr('climate.garage_hvac','target_temp_high') | float(0)) | round(0) | int }}"
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_hvac_enabled
+        state: "on"
+      - condition: template
+        value_template: "{{ master_mode in ['heat','heat_cool'] }}"
+      - condition: template
+        value_template: "{{ ecobee_sp > 0 }}"
+      - condition: template
+        value_template: "{{ (ecobee_sp - low) | abs >= 1 }}"
+    action:
+      - service: timer.start
+        target: { entity_id: timer.garage_setpoint_suppress }
+        data: { duration: "00:00:30" }
+
+      - service: climate.set_temperature
+        target: { entity_id: climate.garage_hvac }
+        data:
+          target_temp_low: "{{ ecobee_sp }}"
+          target_temp_high: "{{ high }}"

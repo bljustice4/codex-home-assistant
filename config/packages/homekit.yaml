@@ -1,0 +1,7 @@
+homekit:
+  - name: Garage Bridge
+    filter:
+      include_entities:
+        - switch.priority_office_2
+        - switch.priority_wood_shop_2
+        - switch.priority_balanced_2
