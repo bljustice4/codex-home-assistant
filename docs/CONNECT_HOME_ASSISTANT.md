@@ -14,6 +14,7 @@ Copy `.env.example` to `.env` and fill in:
 - `HA_TOKEN`: Home Assistant long-lived access token from your HA profile.
 - `HA_SSH_TARGET`: SSH target, usually `homeassistant.local`.
 - `HA_SSH_PORT`: SSH port exposed by the Terminal & SSH add-on.
+- `HA_SSH_ADDON_SLUG`: official Terminal & SSH is usually `core_ssh`.
 
 Do not paste tokens into chat and do not commit `.env`.
 
@@ -32,6 +33,12 @@ The script checks:
 - SSH reachability if the add-on is exposed.
 
 Port `8123` is reachable from this machine. Initial SSH probing found port `22` refused, so set the actual add-on port in `.env` if different.
+
+If Home Assistant Core is reachable but SSH is refusing connections, restart the official Terminal & SSH add-on through the API:
+
+```bash
+scripts/restart_ssh_addon.sh
+```
 
 ## MCP
 

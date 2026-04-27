@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import sys
 import urllib.error
 import urllib.request
@@ -59,10 +60,19 @@ def request_json(method: str, path: str, payload: dict[str, Any] | None = None) 
     except urllib.error.URLError as exc:
         print(f"Could not reach Home Assistant at {HA_URL}: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
+    except TimeoutError as exc:
+        print(f"Home Assistant API request timed out at {HA_URL}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    except socket.timeout as exc:
+        print(f"Home Assistant API request timed out at {HA_URL}", file=sys.stderr)
+        raise SystemExit(1) from exc
 
 
 def cmd_health() -> int:
-    request = urllib.request.Request(f"{HA_URL}/api/", method="GET")
+    headers = {}
+    if HA_TOKEN:
+        headers["Authorization"] = f"Bearer {HA_TOKEN}"
+    request = urllib.request.Request(f"{HA_URL}/api/", headers=headers, method="GET")
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
             body = response.read().decode("utf-8")
@@ -78,6 +88,13 @@ def cmd_health() -> int:
     except urllib.error.URLError as exc:
         print(f"Could not reach Home Assistant at {HA_URL}: {exc}", file=sys.stderr)
         return 1
+    return 0
+
+
+def cmd_restart_addon(addon: str) -> int:
+    require_token()
+    request_json("POST", "/api/services/hassio/addon_restart", {"addon": addon})
+    print(f"Restart requested for add-on: {addon}")
     return 0
 
 
@@ -180,7 +197,7 @@ def cmd_reload(name: str) -> int:
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
-        print("Usage: ha_api.py <health|inventory-climate|reload> [target]", file=sys.stderr)
+        print("Usage: ha_api.py <health|inventory-climate|reload|restart-addon> [target]", file=sys.stderr)
         return 64
 
     command = argv[1]
@@ -193,6 +210,11 @@ def main(argv: list[str]) -> int:
             print("Usage: ha_api.py reload <target>", file=sys.stderr)
             return 64
         return cmd_reload(argv[2])
+    if command == "restart-addon":
+        if len(argv) != 3:
+            print("Usage: ha_api.py restart-addon <addon-slug>", file=sys.stderr)
+            return 64
+        return cmd_restart_addon(argv[2])
 
     print(f"Unknown command: {command}", file=sys.stderr)
     return 64
