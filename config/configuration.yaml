@@ -15,6 +15,28 @@ scene: !include scenes.yaml
 zeroconf:
 
 lovelace:
+  resource_mode: yaml
+  resources:
+    - url: /hacsfiles/Bubble-Card/bubble-card.js
+      type: module
+    - url: /hacsfiles/button-card/button-card.js
+      type: module
+    - url: /hacsfiles/lovelace-card-mod/card-mod.js
+      type: module
+    - url: /hacsfiles/lovelace-layout-card/layout-card.js
+      type: module
+    - url: /hacsfiles/lovelace-mushroom/mushroom.js
+      type: module
+    - url: /hacsfiles/lovelace-slider-entity-row/slider-entity-row.js
+      type: module
+    - url: /hacsfiles/mini-graph-card/mini-graph-card-bundle.js
+      type: module
+    - url: /hacsfiles/modern-circular-gauge/modern-circular-gauge.js
+      type: module
+    - url: /hacsfiles/slider-button-card/slider-button-card.js
+      type: module
+    - url: /hacsfiles/stack-in-card/stack-in-card.js
+      type: module
   dashboards:
     garage-hvac:
       mode: yaml
@@ -25,4 +47,3 @@ lovelace:
 
 homeassistant:
   packages: !include_dir_named packages
-

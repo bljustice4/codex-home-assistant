@@ -1,138 +1,491 @@
 title: Garage HVAC
+button_card_templates:
+  priority_mode:
+    show_icon: true
+    show_name: true
+    show_state: false
+    tap_action:
+      action: call-service
+      service: input_select.select_option
+      target:
+        entity_id: input_select.garage_priority_mode
+    styles:
+      card:
+        - height: 74px
+        - border-radius: 14px
+        - padding: 12px
+        - border: 1px solid rgba(255,255,255,0.10)
+        - box-shadow: none
+        - background: var(--ha-card-background, var(--card-background-color))
+      grid:
+        - grid-template-areas: '"i n"'
+        - grid-template-columns: 30px 1fr
+        - column-gap: 10px
+      icon:
+        - width: 24px
+        - color: var(--secondary-text-color)
+      name:
+        - justify-self: start
+        - font-weight: 700
+        - font-size: 15px
+        - color: var(--primary-text-color)
+    state:
+      - operator: template
+        value: >
+          [[[ return entity.state === variables.mode; ]]]
+        styles:
+          card:
+            - background: >
+                [[[
+                  if (variables.mode === 'Office') return 'rgba(33,150,243,0.18)';
+                  if (variables.mode === 'Wood Shop') return 'rgba(255,152,0,0.20)';
+                  return 'rgba(103,58,183,0.20)';
+                ]]]
+            - border: >
+                [[[
+                  if (variables.mode === 'Office') return '1px solid rgba(33,150,243,0.55)';
+                  if (variables.mode === 'Wood Shop') return '1px solid rgba(255,152,0,0.55)';
+                  return '1px solid rgba(103,58,183,0.55)';
+                ]]]
+          icon:
+            - color: >
+                [[[
+                  if (variables.mode === 'Office') return '#42a5f5';
+                  if (variables.mode === 'Wood Shop') return '#ffa726';
+                  return '#9575cd';
+                ]]]
+
+  status_tile:
+    show_icon: true
+    show_name: true
+    show_state: true
+    tap_action:
+      action: more-info
+    styles:
+      card:
+        - border-radius: 14px
+        - padding: 12px
+        - min-height: 86px
+        - border: 1px solid rgba(255,255,255,0.08)
+        - box-shadow: none
+      grid:
+        - grid-template-areas: '"i" "n" "s"'
+        - grid-template-rows: 28px 20px 22px
+      icon:
+        - width: 25px
+      name:
+        - font-size: 12px
+        - color: var(--secondary-text-color)
+        - justify-self: start
+      state:
+        - font-size: 16px
+        - font-weight: 700
+        - justify-self: start
+
 views:
-  - title: Garage HVAC
-    path: garage-hvac
-    icon: mdi:garage-variant
+  - title: Climate
+    path: climate
+    icon: mdi:thermostat
     cards:
-      - type: thermostat
-        entity: climate.garage_hvac
-        name: Garage Auto Climate
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+          - type: custom:mushroom-title-card
+            title: Garage HVAC
+            subtitle: Detached garage comfort control
+          - type: custom:mushroom-chips-card
+            alignment: justify
+            chips:
+              - type: entity
+                entity: input_select.garage_priority_mode
+                icon: mdi:tune-variant
+                content_info: state
+              - type: entity
+                entity: climate.office
+                icon: mdi:fire
+                content_info: state
+              - type: entity
+                entity: climate.office_ac
+                icon: mdi:snowflake
+                content_info: state
+              - type: entity
+                entity: input_boolean.garage_hvac_enabled
+                icon: mdi:power
+                content_info: state
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 18px;
+              overflow: hidden;
+            }
 
-      - type: entities
-        title: Priority And Control
-        show_header_toggle: false
-        entities:
-          - entity: input_select.garage_priority_mode
-            name: Priority
-          - entity: input_boolean.garage_hvac_enabled
-            name: Automation Enabled
-          - entity: climate.office
-            name: Ecobee Heat
-          - entity: climate.office_ac
-            name: Office AC
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: custom:button-card
+            template: priority_mode
+            entity: input_select.garage_priority_mode
+            name: Office
+            icon: mdi:desk
+            variables:
+              mode: Office
+            tap_action:
+              action: call-service
+              service: input_select.select_option
+              target:
+                entity_id: input_select.garage_priority_mode
+              data:
+                option: Office
+          - type: custom:button-card
+            template: priority_mode
+            entity: input_select.garage_priority_mode
+            name: Wood Shop
+            icon: mdi:tools
+            variables:
+              mode: Wood Shop
+            tap_action:
+              action: call-service
+              service: input_select.select_option
+              target:
+                entity_id: input_select.garage_priority_mode
+              data:
+                option: Wood Shop
+          - type: custom:button-card
+            template: priority_mode
+            entity: input_select.garage_priority_mode
+            name: Sleep
+            icon: mdi:weather-night
+            variables:
+              mode: Sleep
+            tap_action:
+              action: call-service
+              service: input_select.select_option
+              target:
+                entity_id: input_select.garage_priority_mode
+              data:
+                option: Sleep
 
-      - type: glance
-        title: Demand State
-        show_state: true
+      - type: custom:stack-in-card
+        mode: vertical
+        cards:
+          - type: thermostat
+            entity: climate.garage_hvac
+            name: Garage Auto Climate
+          - type: custom:mushroom-chips-card
+            alignment: center
+            chips:
+              - type: entity
+                entity: sensor.garage_control_temperature
+                icon: mdi:thermometer
+                content_info: state
+              - type: entity
+                entity: binary_sensor.garage_furnace_heating
+                icon: mdi:fire
+                content_info: state
+              - type: entity
+                entity: binary_sensor.garage_ac_cooling
+                icon: mdi:snowflake
+                content_info: state
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 18px;
+              overflow: hidden;
+            }
+
+      - type: grid
+        title: Equipment
         columns: 4
-        entities:
-          - entity: input_boolean.garage_heat_demand
+        square: false
+        cards:
+          - type: custom:button-card
+            template: status_tile
+            entity: input_boolean.garage_heat_demand
             name: Heat Demand
             icon: mdi:fire
-          - entity: input_boolean.garage_cool_demand
+            state:
+              - value: "on"
+                styles:
+                  card:
+                    - background: rgba(255,112,67,0.18)
+                  icon:
+                    - color: '#ff7043'
+              - value: "off"
+                styles:
+                  icon:
+                    - color: var(--disabled-text-color)
+          - type: custom:button-card
+            template: status_tile
+            entity: input_boolean.garage_cool_demand
             name: Cool Demand
             icon: mdi:snowflake
-          - entity: binary_sensor.garage_furnace_heating
-            name: Furnace
-          - entity: binary_sensor.garage_ac_cooling
-            name: AC
+            state:
+              - value: "on"
+                styles:
+                  card:
+                    - background: rgba(3,169,244,0.18)
+                  icon:
+                    - color: '#29b6f6'
+              - value: "off"
+                styles:
+                  icon:
+                    - color: var(--disabled-text-color)
+          - type: custom:button-card
+            template: status_tile
+            entity: climate.office
+            name: Ecobee
+            icon: mdi:thermostat
+          - type: custom:button-card
+            template: status_tile
+            entity: climate.office_ac
+            name: Office AC
+            icon: mdi:air-conditioner
 
-      - type: entities
-        title: Room Conditions
-        show_header_toggle: false
+      - type: grid
+        title: Rooms
+        columns: 2
+        square: false
+        cards:
+          - type: custom:stack-in-card
+            mode: vertical
+            cards:
+              - type: custom:mushroom-template-card
+                primary: Office
+                secondary: >
+                  {{ states('sensor.office_temperature') }} F - {{ states('sensor.office_humidity') }}%
+                icon: mdi:desk
+                entity: climate.office_heat_room
+                icon_color: blue
+              - type: custom:mushroom-chips-card
+                alignment: start
+                chips:
+                  - type: entity
+                    entity: select.office_heat_activity_status
+                    icon: mdi:check-circle-outline
+                    content_info: state
+                  - type: entity
+                    entity: sensor.office_cooling_puck_temperature
+                    icon: mdi:access-point
+                    content_info: state
+          - type: custom:stack-in-card
+            mode: vertical
+            cards:
+              - type: custom:mushroom-template-card
+                primary: Wood Shop
+                secondary: >
+                  {{ states('sensor.wood_shop_temperature') }} F - airflow {{ states('select.woodshop_heat_activity_status') }}
+                icon: mdi:tools
+                entity: climate.woodshop_heat_room
+                icon_color: amber
+              - type: custom:mushroom-chips-card
+                alignment: start
+                chips:
+                  - type: entity
+                    entity: select.woodshop_heat_activity_status
+                    icon: mdi:check-circle-outline
+                    content_info: state
+                  - type: entity
+                    entity: climate.woodshop_heat_room
+                    icon: mdi:home-thermometer-outline
+                    content_info: state
+
+      - type: custom:mini-graph-card
+        name: Temperature Trend
+        hours_to_show: 12
+        points_per_hour: 2
+        line_width: 3
+        show:
+          icon: false
+          labels: true
+          legend: true
         entities:
           - entity: sensor.garage_control_temperature
-            name: Control Temperature
+            name: Control
+            color: '#26a69a'
           - entity: sensor.office_temperature
-            name: Ecobee Office Temperature
-          - entity: sensor.office_humidity
-            name: Ecobee Office Humidity
+            name: Office
+            color: '#42a5f5'
           - entity: sensor.wood_shop_temperature
-            name: Wood Shop Temperature
-          - entity: sensor.office_cooling_puck_temperature
-            name: Office Puck Temperature
-          - entity: sensor.office_cooling_puck_humidity
-            name: Office Puck Humidity
+            name: Wood Shop
+            color: '#ffa726'
 
-      - type: entities
-        title: Flair Airflow
-        show_header_toggle: false
+  - title: Stats
+    path: stats
+    icon: mdi:chart-line
+    cards:
+      - type: custom:mushroom-title-card
+        title: Stats
+        subtitle: Runtime, trends, and vent health
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.garage_furnace_heating_today
+            name: Furnace Today
+            icon: mdi:fire
+            icon_color: deep-orange
+          - type: custom:mushroom-entity-card
+            entity: sensor.garage_ac_cooling_today
+            name: AC Today
+            icon: mdi:snowflake
+            icon_color: light-blue
+          - type: custom:mushroom-entity-card
+            entity: sensor.garage_heat_demand_today
+            name: Heat Demand
+            icon: mdi:clock-outline
+            icon_color: orange
+          - type: custom:mushroom-entity-card
+            entity: sensor.garage_cool_demand_today
+            name: Cool Demand
+            icon: mdi:clock-outline
+            icon_color: cyan
+
+      - type: custom:mini-graph-card
+        name: 24 Hour Temperature
+        hours_to_show: 24
+        points_per_hour: 2
+        line_width: 3
+        show:
+          icon: false
+          labels: true
+          legend: true
         entities:
-          - entity: climate.detached_garage_flair_structure
-            name: Flair Structure
-          - entity: select.detached_garage_flair_set_point_controller
-            name: Set Point Controller
-          - entity: select.detached_garage_flair_home_away
-            name: Home/Away
-          - entity: select.detached_garage_flair_active_schedule
-            name: Active Schedule
-          - entity: climate.office_heat_room
-            name: Office Room
-          - entity: climate.woodshop_heat_room
-            name: Wood Shop Room
-          - entity: select.office_heat_activity_status
-            name: Office Activity
-          - entity: select.woodshop_heat_activity_status
-            name: Wood Shop Activity
+          - entity: sensor.garage_control_temperature
+            name: Control
+            color: '#26a69a'
+          - entity: sensor.office_temperature
+            name: Office
+            color: '#42a5f5'
+          - entity: sensor.wood_shop_temperature
+            name: Wood Shop
+            color: '#ffa726'
+
+      - type: history-graph
+        title: Demand Timeline
+        hours_to_show: 24
+        entities:
+          - entity: binary_sensor.garage_furnace_heating
+            name: Furnace Heating
+          - entity: binary_sensor.garage_ac_cooling
+            name: AC Cooling
+          - entity: input_boolean.garage_heat_demand
+            name: Heat Demand
+          - entity: input_boolean.garage_cool_demand
+            name: Cool Demand
 
       - type: entities
         title: Vent Health
         show_header_toggle: false
         entities:
+          - type: section
+            label: Office Vent 1
           - entity: binary_sensor.woodshop_heat_82d1_connection_status
-            name: Office Vent 1 Connection
+            name: Connection
           - entity: sensor.woodshop_heat_82d1_voltage
-            name: Office Vent 1 Battery
+            name: Battery
           - entity: sensor.woodshop_heat_82d1_reported_state
-            name: Office Vent 1 Position
+            name: Position
+          - entity: sensor.woodshop_heat_82d1_rssi
+            name: Signal
+          - type: section
+            label: Office Vent 2
           - entity: binary_sensor.office_heat_d84a_connection_status
-            name: Office Vent 2 Connection
+            name: Connection
           - entity: sensor.office_heat_d84a_voltage
-            name: Office Vent 2 Battery
+            name: Battery
           - entity: sensor.office_heat_d84a_reported_state
-            name: Office Vent 2 Position
+            name: Position
+          - entity: sensor.office_heat_d84a_rssi
+            name: Signal
+          - type: section
+            label: Wood Shop Vent
           - entity: binary_sensor.office_heat_f54b_connection_status
-            name: Wood Shop Vent Connection
+            name: Connection
           - entity: sensor.office_heat_f54b_voltage
-            name: Wood Shop Vent Battery
+            name: Battery
           - entity: sensor.office_heat_f54b_reported_state
-            name: Wood Shop Vent Position
+            name: Position
+          - entity: sensor.office_heat_f54b_rssi
+            name: Signal
 
-      - type: entities
-        title: Runtime Today
-        show_header_toggle: false
-        entities:
-          - entity: sensor.garage_furnace_heating_today
-            name: Furnace Heating
-          - entity: sensor.garage_ac_cooling_today
-            name: AC Cooling
-          - entity: sensor.garage_heat_demand_today
-            name: Heat Demand
-          - entity: sensor.garage_cool_demand_today
-            name: Cool Demand
-
-      - type: history-graph
-        title: Last 12 Hours
-        hours_to_show: 12
-        entities:
-          - entity: sensor.garage_control_temperature
-            name: Control Temp
-          - entity: binary_sensor.garage_furnace_heating
-            name: Furnace
-          - entity: binary_sensor.garage_ac_cooling
-            name: AC
-
-      - type: entities
+  - title: Advanced
+    path: advanced
+    icon: mdi:tune-variant
+    cards:
+      - type: custom:mushroom-title-card
         title: Advanced
+        subtitle: Direct controls and integration state
+
+      - type: entities
+        title: System Controls
         show_header_toggle: false
         entities:
+          - entity: input_boolean.garage_hvac_enabled
+            name: Automation Enabled
+          - entity: climate.garage_hvac
+            name: Garage HVAC
           - entity: input_number.garage_ac_default_setpoint
             name: AC Actuator Setpoint
+          - entity: input_boolean.garage_low_manual_request
+            name: Pending Heat Setpoint Sync
+
+      - type: entities
+        title: Direct Equipment
+        show_header_toggle: false
+        entities:
+          - entity: climate.office
+            name: Ecobee Heat
+          - entity: climate.office_ac
+            name: Office AC
+          - entity: switch.office_ac_power
+            name: Office AC Power
+          - entity: input_boolean.garage_heat_demand
+            name: Heat Demand
+          - entity: input_boolean.garage_cool_demand
+            name: Cool Demand
+
+      - type: entities
+        title: Flair Structure
+        show_header_toggle: false
+        entities:
+          - entity: climate.detached_garage_flair_structure
+            name: Structure
+          - entity: select.detached_garage_flair_system_mode
+            name: System Mode
+          - entity: select.detached_garage_flair_set_point_controller
+            name: Set Point Controller
+          - entity: select.detached_garage_flair_home_away
+            name: Home/Away
+          - entity: select.detached_garage_flair_home_away_mode_set_by
+            name: Home/Away Set By
+          - entity: select.detached_garage_flair_active_schedule
+            name: Active Schedule
+          - entity: select.detached_garage_flair_default_hold_duration
+            name: Default Hold Duration
+
+      - type: entities
+        title: Room Activity
+        show_header_toggle: false
+        entities:
+          - entity: climate.office_heat_room
+            name: Office Flair Room
+          - entity: select.office_heat_activity_status
+            name: Office Activity
+          - entity: climate.woodshop_heat_room
+            name: Wood Shop Flair Room
+          - entity: select.woodshop_heat_activity_status
+            name: Wood Shop Activity
+
+      - type: entities
+        title: Timers
+        show_header_toggle: false
+        entities:
           - entity: timer.garage_startup_grace
             name: Startup Grace
           - entity: timer.garage_setpoint_suppress
             name: Setpoint Suppress
           - entity: timer.garage_priority_suppress
             name: Priority Suppress
-          - entity: input_boolean.garage_low_manual_request
-            name: Pending Heat Setpoint Sync
