@@ -90,108 +90,65 @@ views:
       - type: custom:stack-in-card
         mode: vertical
         cards:
-          - type: custom:mushroom-title-card
-            title: Garage HVAC
-            subtitle: Detached garage comfort control
-          - type: custom:mushroom-chips-card
-            alignment: justify
-            chips:
-              - type: entity
-                entity: input_select.garage_priority_mode
-                icon: mdi:tune-variant
-                content_info: state
-              - type: entity
-                entity: climate.office
-                icon: mdi:fire
-                content_info: state
-              - type: entity
-                entity: climate.office_ac
-                icon: mdi:snowflake
-                content_info: state
-              - type: entity
-                entity: input_boolean.garage_hvac_enabled
-                icon: mdi:power
-                content_info: state
-        card_mod:
-          style: |
-            ha-card {
-              border-radius: 18px;
-              overflow: hidden;
-            }
-
-      - type: grid
-        columns: 3
-        square: false
-        cards:
-          - type: custom:button-card
-            template: priority_mode
-            entity: input_select.garage_priority_mode
-            name: Office
-            icon: mdi:desk
-            variables:
-              mode: Office
-            tap_action:
-              action: call-service
-              service: input_select.select_option
-              target:
-                entity_id: input_select.garage_priority_mode
-              data:
-                option: Office
-          - type: custom:button-card
-            template: priority_mode
-            entity: input_select.garage_priority_mode
-            name: Wood Shop
-            icon: mdi:tools
-            variables:
-              mode: Wood Shop
-            tap_action:
-              action: call-service
-              service: input_select.select_option
-              target:
-                entity_id: input_select.garage_priority_mode
-              data:
-                option: Wood Shop
-          - type: custom:button-card
-            template: priority_mode
-            entity: input_select.garage_priority_mode
-            name: Sleep
-            icon: mdi:weather-night
-            variables:
-              mode: Sleep
-            tap_action:
-              action: call-service
-              service: input_select.select_option
-              target:
-                entity_id: input_select.garage_priority_mode
-              data:
-                option: Sleep
-
-      - type: custom:stack-in-card
-        mode: vertical
-        cards:
           - type: thermostat
             entity: climate.garage_hvac
             name: Garage Auto Climate
-          - type: custom:mushroom-chips-card
-            alignment: center
-            chips:
-              - type: entity
-                entity: sensor.garage_control_temperature
-                icon: mdi:thermometer
-                content_info: state
-              - type: entity
-                entity: binary_sensor.garage_furnace_heating
-                icon: mdi:fire
-                content_info: state
-              - type: entity
-                entity: binary_sensor.garage_ac_cooling
-                icon: mdi:snowflake
-                content_info: state
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: custom:button-card
+                template: priority_mode
+                entity: input_select.garage_priority_mode
+                name: Office
+                icon: mdi:desk
+                variables:
+                  mode: Office
+                tap_action:
+                  action: call-service
+                  service: input_select.select_option
+                  target:
+                    entity_id: input_select.garage_priority_mode
+                  data:
+                    option: Office
+              - type: custom:button-card
+                template: priority_mode
+                entity: input_select.garage_priority_mode
+                name: Wood Shop
+                icon: mdi:tools
+                variables:
+                  mode: Wood Shop
+                tap_action:
+                  action: call-service
+                  service: input_select.select_option
+                  target:
+                    entity_id: input_select.garage_priority_mode
+                  data:
+                    option: Wood Shop
+              - type: custom:button-card
+                template: priority_mode
+                entity: input_select.garage_priority_mode
+                name: Sleep
+                icon: mdi:weather-night
+                variables:
+                  mode: Sleep
+                tap_action:
+                  action: call-service
+                  service: input_select.select_option
+                  target:
+                    entity_id: input_select.garage_priority_mode
+                  data:
+                    option: Sleep
         card_mod:
           style: |
             ha-card {
               border-radius: 18px;
               overflow: hidden;
+              padding: 10px 12px 14px;
+            }
+            hui-grid-card {
+              display: block;
+              padding: 4px 8px 8px;
             }
 
       - type: grid
@@ -253,42 +210,204 @@ views:
               - type: custom:mushroom-template-card
                 primary: Office
                 secondary: >
-                  {{ states('sensor.office_temperature') }} F - {{ states('sensor.office_humidity') }}%
+                  {{ states('sensor.office_temperature') }} F - Airflow:
+                  {% set airflow = states('select.office_heat_activity_status') %}
+                  {% if airflow | lower == 'active' %}
+                    Active
+                  {% elif airflow not in ['unknown', 'unavailable'] %}
+                    Inactive
+                  {% else %}
+                    {{ airflow | title }}
+                  {% endif %}
                 icon: mdi:desk
                 entity: climate.office_heat_room
                 icon_color: blue
               - type: custom:mushroom-chips-card
                 alignment: start
                 chips:
-                  - type: entity
+                  - type: template
                     entity: select.office_heat_activity_status
-                    icon: mdi:check-circle-outline
-                    content_info: state
-                  - type: entity
-                    entity: sensor.office_cooling_puck_temperature
-                    icon: mdi:access-point
-                    content_info: state
+                    icon: >
+                      {% if states('select.office_heat_activity_status') | lower == 'active' %}
+                        mdi:fan
+                      {% else %}
+                        mdi:fan-off
+                      {% endif %}
+                    icon_color: >
+                      {% if states('select.office_heat_activity_status') | lower == 'active' %}
+                        green
+                      {% else %}
+                        disabled
+                      {% endif %}
+                    content: >
+                      {% if states('select.office_heat_activity_status') | lower == 'active' %}
+                        Airflow Active
+                      {% else %}
+                        Airflow Inactive
+                      {% endif %}
+                  - type: template
+                    entity: sensor.woodshop_heat_82d1_reported_state
+                    icon: >
+                      {% set pct = states('sensor.woodshop_heat_82d1_reported_state') | float(-1) %}
+                      {% if pct == 0 %}
+                        mdi:window-shutter
+                      {% elif pct == 100 %}
+                        mdi:window-shutter-open
+                      {% else %}
+                        mdi:window-shutter-alert
+                      {% endif %}
+                    icon_color: >
+                      {% set pct = states('sensor.woodshop_heat_82d1_reported_state') | float(-1) %}
+                      {% if pct == 0 %}
+                        disabled
+                      {% elif pct == 100 %}
+                        green
+                      {% elif pct > 0 and pct < 100 %}
+                        amber
+                      {% else %}
+                        red
+                      {% endif %}
+                    content: >
+                      Vent 1:
+                      {% set pct = states('sensor.woodshop_heat_82d1_reported_state') | float(-1) %}
+                      {% if pct == 0 %}
+                        Closed
+                      {% elif pct == 100 %}
+                        Open
+                      {% elif pct > 0 and pct < 100 %}
+                        Half
+                      {% else %}
+                        Unknown
+                      {% endif %}
+                  - type: template
+                    entity: sensor.office_heat_d84a_reported_state
+                    icon: >
+                      {% set pct = states('sensor.office_heat_d84a_reported_state') | float(-1) %}
+                      {% if pct == 0 %}
+                        mdi:window-shutter
+                      {% elif pct == 100 %}
+                        mdi:window-shutter-open
+                      {% else %}
+                        mdi:window-shutter-alert
+                      {% endif %}
+                    icon_color: >
+                      {% set pct = states('sensor.office_heat_d84a_reported_state') | float(-1) %}
+                      {% if pct == 0 %}
+                        disabled
+                      {% elif pct == 100 %}
+                        green
+                      {% elif pct > 0 and pct < 100 %}
+                        amber
+                      {% else %}
+                        red
+                      {% endif %}
+                    content: >
+                      Vent 2:
+                      {% set pct = states('sensor.office_heat_d84a_reported_state') | float(-1) %}
+                      {% if pct == 0 %}
+                        Closed
+                      {% elif pct == 100 %}
+                        Open
+                      {% elif pct > 0 and pct < 100 %}
+                        Half
+                      {% else %}
+                        Unknown
+                      {% endif %}
+            card_mod:
+              style: |
+                ha-card {
+                  border-radius: 18px;
+                  overflow: hidden;
+                }
+                mushroom-chips-card {
+                  display: block;
+                  padding: 0 12px 12px;
+                }
           - type: custom:stack-in-card
             mode: vertical
             cards:
               - type: custom:mushroom-template-card
                 primary: Wood Shop
                 secondary: >
-                  {{ states('sensor.wood_shop_temperature') }} F - airflow {{ states('select.woodshop_heat_activity_status') }}
+                  {{ states('sensor.wood_shop_temperature') }} F - Airflow:
+                  {% set airflow = states('select.woodshop_heat_activity_status') %}
+                  {% if airflow | lower == 'active' %}
+                    Active
+                  {% elif airflow not in ['unknown', 'unavailable'] %}
+                    Inactive
+                  {% else %}
+                    {{ airflow | title }}
+                  {% endif %}
                 icon: mdi:tools
                 entity: climate.woodshop_heat_room
                 icon_color: amber
               - type: custom:mushroom-chips-card
                 alignment: start
                 chips:
-                  - type: entity
+                  - type: template
                     entity: select.woodshop_heat_activity_status
-                    icon: mdi:check-circle-outline
-                    content_info: state
-                  - type: entity
-                    entity: climate.woodshop_heat_room
-                    icon: mdi:home-thermometer-outline
-                    content_info: state
+                    icon: >
+                      {% if states('select.woodshop_heat_activity_status') | lower == 'active' %}
+                        mdi:fan
+                      {% else %}
+                        mdi:fan-off
+                      {% endif %}
+                    icon_color: >
+                      {% if states('select.woodshop_heat_activity_status') | lower == 'active' %}
+                        green
+                      {% else %}
+                        disabled
+                      {% endif %}
+                    content: >
+                      {% if states('select.woodshop_heat_activity_status') | lower == 'active' %}
+                        Airflow Active
+                      {% else %}
+                        Airflow Inactive
+                      {% endif %}
+                  - type: template
+                    entity: sensor.office_heat_f54b_reported_state
+                    icon: >
+                      {% set pct = states('sensor.office_heat_f54b_reported_state') | float(-1) %}
+                      {% if pct == 0 %}
+                        mdi:window-shutter
+                      {% elif pct == 100 %}
+                        mdi:window-shutter-open
+                      {% else %}
+                        mdi:window-shutter-alert
+                      {% endif %}
+                    icon_color: >
+                      {% set pct = states('sensor.office_heat_f54b_reported_state') | float(-1) %}
+                      {% if pct == 0 %}
+                        disabled
+                      {% elif pct == 100 %}
+                        green
+                      {% elif pct > 0 and pct < 100 %}
+                        amber
+                      {% else %}
+                        red
+                      {% endif %}
+                    content: >
+                      Vent:
+                      {% set pct = states('sensor.office_heat_f54b_reported_state') | float(-1) %}
+                      {% if pct == 0 %}
+                        Closed
+                      {% elif pct == 100 %}
+                        Open
+                      {% elif pct > 0 and pct < 100 %}
+                        Half
+                      {% else %}
+                        Unknown
+                      {% endif %}
+            card_mod:
+              style: |
+                ha-card {
+                  border-radius: 18px;
+                  overflow: hidden;
+                }
+                mushroom-chips-card {
+                  display: block;
+                  padding: 0 12px 12px;
+                }
 
       - type: custom:mini-graph-card
         name: Temperature Trend
