@@ -244,6 +244,21 @@ script:
               - condition: template
                 value_template: "{{ action_type == 'cool_on' }}"
               - condition: state
+                entity_id: input_select.garage_priority_mode
+                state: "Sleep"
+            sequence:
+              - service: input_boolean.turn_off
+                target: { entity_id: input_boolean.garage_cool_demand }
+              - service: climate.set_hvac_mode
+                target: { entity_id: climate.office_ac }
+                data: { hvac_mode: "off" }
+              - service: switch.turn_off
+                target: { entity_id: switch.office_ac_power }
+
+          - conditions:
+              - condition: template
+                value_template: "{{ action_type == 'cool_on' }}"
+              - condition: state
                 entity_id: input_boolean.garage_hvac_enabled
                 state: "on"
             sequence:
@@ -561,6 +576,24 @@ automation:
       - service: input_select.select_option
         target: { entity_id: input_select.garage_priority_mode }
         data: { option: "{{ desired_priority }}" }
+
+  ###########################################################################
+  # Sleep priority disables cooling
+  ###########################################################################
+  - id: garage_sleep_priority_disables_ac
+    alias: "Garage - Sleep priority disables AC"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_select.garage_priority_mode
+        to: "Sleep"
+    condition:
+      - condition: state
+        entity_id: input_boolean.garage_hvac_enabled
+        state: "on"
+    action:
+      - service: script.garage_apply_hvac_demand
+        data: { demand_action: "cool_off" }
 
   ###########################################################################
   # Deadband enforcement (cool >= heat + 3°F)
